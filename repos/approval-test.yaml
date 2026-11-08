@@ -3,5 +3,3 @@ codeowners: "@nickjbarton"
 visibility: public
 risk: high
 topics: []
-guardrails:
-  enforce_delete_protection: true
