@@ -17,10 +17,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  apply:
-    name: Apply
+  # Plans, runs the policy gate, and decides whether a reviewer must approve before apply.
+  # Approval is needed for any repo delete, and for any change to a repo matching approval_gate in guardrails.yaml.
+  plan:
+    name: Plan and decide approval
     runs-on: ubuntu-latest
-    environment: repo-provisioning-prod
+    outputs:
+      approval: ${{ steps.gate.outputs.approval }}
     env:
       TF_CLOUD_ORGANIZATION: ${{ vars.TF_CLOUD_ORGANIZATION }}
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
@@ -44,9 +47,6 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$GITHUB_APP_PEM_FILE_CONTENT" > "$RUNNER_TEMP/app.pem"
-          echo "APP_PRIVATE_KEY: $(wc -c < "$RUNNER_TEMP/app.pem") bytes, $(wc -l < "$RUNNER_TEMP/app.pem") lines"
-          echo "First line: $(head -n 1 "$RUNNER_TEMP/app.pem")"
-          echo "Last line: $(tail -n 1 "$RUNNER_TEMP/app.pem")"
           if ! openssl rsa -in "$RUNNER_TEMP/app.pem" -noout -check > /dev/null 2>&1; then
             echo "::error::APP_PRIVATE_KEY is not a valid RSA PEM key. Re-paste the full .pem file into the secret."
             exit 1
@@ -77,6 +77,77 @@ jobs:
 
       - name: Compliance policy gate
         run: conftest test "$RUNNER_TEMP/plan.json" --policy policy --data policy/guardrails.yaml
+
+      - name: Decide approval environment
+        id: gate
+        run: |
+          APPROVAL=$(jq -r '
+            (([.resource_changes[] | select(.type == "github_repository") | select(.change.actions | index("delete"))] | length) > 0)
+            or
+            (([.resource_changes[] | select(.type == "terraform_data") | select(.change.actions != ["no-op"]) | select(.change.after.input.approval_required == true)] | length) > 0)
+          ' "$RUNNER_TEMP/plan.json")
+          echo "approval=$APPROVAL" >> "$GITHUB_OUTPUT"
+          echo "Approval required: $APPROVAL"
+
+      - name: Upload saved plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: terraform/tfplan
+          retention-days: 7
+
+      - name: Remove PEM
+        if: always()
+        run: rm -f "$RUNNER_TEMP/app.pem"
+
+  # Runs the saved plan. Uses repo-provisioning-approval (required reviewers) when the plan needs approval.
+  apply:
+    name: Apply
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: ${{ needs.plan.outputs.approval == 'true' && 'repo-provisioning-approval' || 'repo-provisioning-prod' }}
+    env:
+      TF_CLOUD_ORGANIZATION: ${{ vars.TF_CLOUD_ORGANIZATION }}
+      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+      GITHUB_OWNER: ${{ vars.REPO_OWNER }}
+      GITHUB_APP_ID: ${{ vars.APP_ID }}
+      GITHUB_APP_INSTALLATION_ID: ${{ vars.APP_INSTALLATION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Download saved plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: terraform
+
+      - name: Authenticate GitHub App
+        env:
+          GITHUB_APP_PEM_FILE_CONTENT: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$GITHUB_APP_PEM_FILE_CONTENT" ]; then
+            echo "::error::APP_PRIVATE_KEY secret is empty or not available to this workflow"
+            exit 1
+          fi
+          printf '%s\n' "$GITHUB_APP_PEM_FILE_CONTENT" > "$RUNNER_TEMP/app.pem"
+          if ! openssl rsa -in "$RUNNER_TEMP/app.pem" -noout -check > /dev/null 2>&1; then
+            echo "::error::APP_PRIVATE_KEY is not a valid RSA PEM key. Re-paste the full .pem file into the secret."
+            exit 1
+          fi
+          {
+            echo "GITHUB_APP_PEM_FILE<<PEM_EOF"
+            cat "$RUNNER_TEMP/app.pem"
+            echo "PEM_EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Init
+        run: terraform init -input=false
+        working-directory: terraform
 
       - name: Apply
         run: terraform apply -input=false -auto-approve tfplan

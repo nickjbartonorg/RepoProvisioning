@@ -34,6 +34,7 @@ One file per repo, named `<repo-name>.yaml`. The file name must match the repo n
 | `type` | No | `service` | Backstage Component type, for example `documentation`. Must be a string. Read by the Backstage entity provider. |
 | `techdocs_ref` | No | None | TechDocs source, for example `url:https://github.com/org/repo`. Written to `backstage.io/techdocs-ref`. Must be a string. Read by the Backstage entity provider. |
 | `guardrails` | No | None | Turns `enforce_*` flags on for this repo only. See [Per-repo guardrails](#per-repo-guardrails). |
+| `risk` | No | `standard` | `standard` or `high`. A `high` repo that is `public` needs approval before apply (see [Approval](#approval)). |
 
 ## Guardrails
 
@@ -211,3 +212,22 @@ cd .. && conftest verify --policy policy --data policy/guardrails.yaml
 - A new key is only validated if a config check is added for it in `policy/guardrails.rego`. Add one when you add a key.
 - Repo overrides are checked by Terraform's precondition, which runs during plan. The policy only sees the effective result.
 - The checks rely on the attribute names in the Terraform provider. A provider upgrade can rename an attribute, so the tests should be run after upgrading `integrations/github`.
+
+## Approval
+
+Apply runs in two jobs. The plan job runs the policy gate on the saved plan and decides whether a person must approve. If it decides yes, apply waits on the `repo-provisioning-approval` environment.
+
+Approval is needed when the plan:
+
+- deletes a repo, or
+- creates or changes a repo with `risk: high` and `visibility: public`. The pair is set in `approval_gate` in `policy/guardrails.yaml`.
+
+Any other change applies without approval, using the `repo-provisioning-prod` environment.
+
+Setup (once, in GitHub settings for this repo): create the environment `repo-provisioning-approval` with required reviewers. Leave "Prevent self-review" off while you are the only reviewer. Without required reviewers the environment has no gate.
+
+## Delete protection
+
+Set `enforce_delete_protection: true` in a repo file's `guardrails:` section to block deletion of that repo. The policy rejects any plan that removes the repo while the flag is on.
+
+To delete a protected repo: open a PR that turns the flag off, merge it, then open a PR that removes the repo file. The delete still needs approval at apply.

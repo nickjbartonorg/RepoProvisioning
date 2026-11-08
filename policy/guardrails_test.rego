@@ -227,3 +227,20 @@ test_template_ref_not_string_denied if {
 		with data.name_pattern as "^[a-z][a-z0-9-]{2,49}$"
 		with data.allowed_visibility as ["public", "private"]
 }
+
+deleted_effective_for(name, flag) := {
+	"address": sprintf("terraform_data.effective_guardrails[\"%s\"]", [name]),
+	"type": "terraform_data",
+	"change": {
+		"actions": ["delete"],
+		"before": {"input": object.union({"name": name}, with_flag("enforce_delete_protection", flag))},
+	},
+}
+
+test_delete_blocked_when_protected if {
+	count(deny) == 1 with input as {"resource_changes": [deleted_effective_for("demo-app", true)]}
+}
+
+test_delete_allowed_when_not_protected if {
+	count(deny) == 0 with input as {"resource_changes": [deleted_effective_for("demo-app", false)]}
+}

@@ -35,6 +35,16 @@ enforce_ruleset_block_deletion: true
 enforce_ruleset_block_force_push: true
 enforce_ruleset_linear_history: true
 
+# Delete protection. true = the policy blocks any plan that deletes a repo with this flag on.
+# To remove a protected repo: turn the flag off in its own PR, merge it, then remove the repo file.
+enforce_delete_protection: false
+
+# Approval gate. A repo with this risk and visibility needs a reviewer on the approval
+# environment before apply (see .github/workflows/terraform-apply.yml). Deletes always need one.
+approval_gate:
+  risk: high
+  visibility: public
+
 # Tighter (or equal) settings by repo visibility. Keys: any enforce_* flag, or min_required_reviews.
 visibility_profiles:
   public:

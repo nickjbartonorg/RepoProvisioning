@@ -27,6 +27,7 @@ locals {
     trimsuffix(f, ".yaml") => merge(
       {
         visibility       = local.guardrails.default_visibility
+        risk             = "standard"
         topics           = []
         default_branch   = "main"
         required_reviews = local.guardrails.default_required_reviews
@@ -67,6 +68,11 @@ resource "github_repository" "this" {
     precondition {
       condition     = try(tostring(each.value.owner) == each.value.owner, each.value.owner == null)
       error_message = "${each.key}: owner must be a string, for example user:default/nick."
+    }
+
+    precondition {
+      condition     = contains(["standard", "high"], each.value.risk)
+      error_message = "${each.key}: risk must be \"standard\" or \"high\"."
     }
 
     precondition {
@@ -115,7 +121,17 @@ resource "terraform_data" "profile_validation" {
 resource "terraform_data" "effective_guardrails" {
   for_each = local.repositories
 
-  input = merge({ name = each.key, owner = each.value.owner, template_ref = each.value.template_ref }, local.effective[each.key])
+  input = merge(
+    {
+      name              = each.key
+      owner             = each.value.owner
+      template_ref      = each.value.template_ref
+      visibility        = each.value.visibility
+      risk              = each.value.risk
+      approval_required = each.value.risk == local.guardrails.approval_gate.risk && each.value.visibility == local.guardrails.approval_gate.visibility
+    },
+    local.effective[each.key]
+  )
 }
 
 resource "github_repository_vulnerability_alerts" "this" {

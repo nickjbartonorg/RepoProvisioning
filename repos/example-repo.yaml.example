@@ -5,6 +5,7 @@ codeowners: "@your-github-user-or-org/team"                 # required, becomes 
 visibility: public                                          # optional, default: default_visibility
 topics: ["example"]                                         # optional
 required_reviews: 1                                         # optional, default: default_required_reviews
+risk: standard                                              # optional, standard (default) or high. High + public needs approval
 # Optional: turn guardrails ON for this repo only. Values here can only enable a guardrail.
 # guardrails:
 #   enforce_branch_protection: true

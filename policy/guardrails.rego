@@ -110,6 +110,32 @@ deny contains msg if {
 	msg := "guardrails.yaml: 'enforce_ruleset_linear_history' is missing or has the wrong type"
 }
 
+deny contains msg if {
+	not is_boolean(data.enforce_delete_protection)
+	msg := "guardrails.yaml: 'enforce_delete_protection' is missing or has the wrong type"
+}
+
+deny contains msg if {
+	not is_string(data.approval_gate.risk)
+	msg := "guardrails.yaml: 'approval_gate.risk' is missing or has the wrong type"
+}
+
+deny contains msg if {
+	not is_string(data.approval_gate.visibility)
+	msg := "guardrails.yaml: 'approval_gate.visibility' is missing or has the wrong type"
+}
+
+# Delete protection. Checks what the plan removes, so it covers repos that leave repos/ as well.
+# terraform_data.effective_guardrails carries the flag in its before-state when the repo is removed.
+deny contains msg if {
+	some rc in input.resource_changes
+	rc.type == "terraform_data"
+	some action in rc.change.actions
+	action == "delete"
+	rc.change.before.input.enforce_delete_protection == true
+	msg := sprintf("%s: delete is blocked by enforce_delete_protection. Turn the flag off in its own PR, merge it, then remove the repo file.", [rc.address])
+}
+
 # Every repo must have effective flags in the plan.
 deny contains msg if {
 	some r in repos
