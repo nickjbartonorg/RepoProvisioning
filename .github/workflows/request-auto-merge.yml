@@ -13,7 +13,8 @@ jobs:
   enable-auto-merge:
     name: Enable auto-merge
     if: >-
-      startsWith(github.event.pull_request.head.ref, 'repo-request/') &&
+      (startsWith(github.event.pull_request.head.ref, 'repo-request/') ||
+       startsWith(github.event.pull_request.head.ref, 'repo-update/')) &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
