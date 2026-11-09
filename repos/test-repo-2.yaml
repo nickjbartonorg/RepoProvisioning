@@ -4,3 +4,5 @@ visibility: private
 risk: standard
 topics: []
 required_reviews: 2
+guardrails:
+  enforce_delete_protection: true
