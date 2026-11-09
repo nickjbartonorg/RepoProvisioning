@@ -1,9 +1,9 @@
-# Copy to <repo-name>.yaml (file name must equal the repo name) and open a PR.
-# Fields marked optional have defaults in terraform/main.tf.
-#
-description: "testing repository provisioning"   # required
-codeowners: "@nickjbarton"                       # required, becomes * owner in CODEOWNERS
-visibility: private                               # optional, default: private
-topics: ["example"]                              # optional
-required_reviews: 1                              # optional, default: 1
-# Per repo guardrails (Must be less permissive than defined in guardrails.yaml)
+description: testing repository provisioning
+codeowners: "@nickjbarton"
+visibility: private
+topics:
+  - example
+required_reviews: 1
+risk: standard
+guardrails:
+  enforce_delete_protection: true
