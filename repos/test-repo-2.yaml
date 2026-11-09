@@ -1,6 +1,6 @@
-description: "Test repository"
+description: Test repository
 codeowners: "@nickjbarton"
 visibility: private
 risk: standard
 topics: []
-required_reviews: 1
+required_reviews: 2
