@@ -176,7 +176,7 @@ jobs:
       - name: Find the request PR for this commit
         id: pr
         run: |
-          PR=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '[.[] | select(.merged_at != null)][0].number // empty')
+          PR=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --jq '[.[] | select(.merged_at != null and (.head.ref | startswith("repo-request/")))][0].number // empty')
           echo "number=$PR" >> "$GITHUB_OUTPUT"
 
       - name: Comment on successful apply
