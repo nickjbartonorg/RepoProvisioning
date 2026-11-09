@@ -1,6 +1,6 @@
 description: Test repository
 codeowners: "@nickjbarton"
-visibility: private
+visibility: public
 risk: high
 topics: []
 required_reviews: 2
